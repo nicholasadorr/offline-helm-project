@@ -5,7 +5,7 @@ ENV HELM_VERSION="v3.2.4"
 
 
 RUN apk update && apk add --no-cache python py-pip ca-certificates bash git openssh curl &&\
-    git clone https://github.com/mjschmidt/offline-helm-project.git &&\
+    git clone https://github.com/nicholasadorr/offline-helm-project.git &&\
     pip install awscli &&\
     wget https://dl.min.io/client/mc/release/linux-amd64/mc && chmod +x mc && mv mc /usr/bin &&\
     wget -q https://storage.googleapis.com/kubernetes-release/release/${KUBE_LATEST_VERSION}/bin/linux/amd64/kubectl -O /usr/local/bin/kubectl &&\
