@@ -451,6 +451,7 @@ rm -rf kubernetes-charts-incubator kubernetes-charts chartpics bitnami-charts vm
 
 #end of clean up and tar creation
 
+cd $pathtocharts
 cd ../
 rm -rf ./charts
 cd $pathtocharts
