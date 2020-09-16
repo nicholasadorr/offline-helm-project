@@ -85,16 +85,15 @@ cd $stablecharts
 helm repo add stable https://kubernetes-charts.storage.googleapis.com
 helm repo update
 
-This command finds every version of every helm chart and puts it into a file where we can actually do something with it
+#This command finds every version of every helm chart and puts it into a file where we can actually do something with it
 helm search repo stable --versions | cut -c -47 | grep -v NAME | awk '{$1=$1};1' | sed 's/ / --version /g' > fetch-stable.txt
 
-This commnd pulls all of the Rook charts contained within the index file
+#This commnd pulls all of the Rook charts contained within the index file
 curl -L  https://kubernetes-charts.storage.googleapis.com/index.yaml | grep -v icon: | grep -v home | grep tgz | cut -c 7- |xargs -P 10 -n 1 wget
-
 curl down the rookcephindex file
 curl -o index.yaml -L https://kubernetes-charts.storage.googleapis.com/index.yaml
 
-get the list of all the charts for the same type of for loop as we do with stable and incubator
+#get the list of all the charts for the same type of for loop as we do with stable and incubator
 mv fetch-stable.txt ../
 cd ../
 echo $(pwd)
@@ -299,9 +298,6 @@ function GETVMWARECHARTDEPS {
 for f in `cat vmware.charts.txt`;
 do
 echo
-echo
-echo
-echo
 
 mkdir /tmp/$f-final
 #helm template --output-dir /tmp/$f-final $vmwarecharts/$f
@@ -455,10 +451,6 @@ rm -rf kubernetes-charts-incubator kubernetes-charts chartpics bitnami-charts vm
 
 #end of clean up and tar creation
 
-echo
-echo
-
-cd $pathtocharts
 cd ../
 rm -rf ./charts
 cd $pathtocharts
