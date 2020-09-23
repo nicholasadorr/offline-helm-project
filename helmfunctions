@@ -1,0 +1,440 @@
+#/bin/bash
+
+function SETVERS {
+#set global variables
+imagestoreurl=https://test.com
+chartstoreurl=test.com
+bucket=pics
+pathtocharts=$(pwd)
+
+#set helm chart stable variables
+indexfilestable=/tmp/stable/index.yaml
+stablecharts=$pathtocharts'/stable'
+mkdir $stablecharts
+
+#set helm chart incubator variables
+indexfileincubator=/tmp/incubator/index.yaml
+incubatorcharts=$pathtocharts'/incubator'
+mkdir $incubatorcharts
+
+#set bitnami helm chart variables & since bitnami takes so long, in the future we'll only want to get the delta's so we want to keep track of the old list as well as the new list. For now, we don't do that, but setup for follow on work.
+indexfilebitnami=/tmp/bitnami-charts/index.yaml
+bitnamicharts=$pathtocharts'/bitnami-charts'
+rm -rf $bitnamicharts'-old'
+mv $bitnamicharts $bitnamicharts'-old'
+mkdir $bitnamicharts
+
+#set rook-ceph helm chart variables.
+indexfilerookceph=/tmp/rookceph-charts/index.yaml
+rookcephcharts=$pathtocharts'/rookceph-charts'
+rm -rf $rookcephcharts'-old'
+mv $rookcephcharts $rookcephcharts'-old'
+mkdir $rookcephcharts
+
+
+#set ranchestable helm chart variables.
+indexfilerancherstable=/tmp/rancherstable-charts/index.yaml
+rancherstablecharts=$pathtocharts'/rancherstable-charts'
+rm -rf $rancherstablecharts'-old'
+mv $rancherstablecharts $rancherstablecharts'-old'
+mkdir $rancherstablecharts
+
+#set rancherlatest helm chart variables.
+indexfilerancherlatest=/tmp/rancherlatest-charts/index.yaml
+rancherlatestcharts=$pathtocharts'/rancherlatest-charts'
+rm -rf $rancherlatestcharts'-old'
+mv $rancherlatestcharts $rancherlatestcharts'-old'
+mkdir $rancherlatestcharts
+
+#set vmware helm chart variables & since vmware takes so long, in the future we'll only want to get the delta's so we want to keep track of the old list as well as the new list. For now, we don't do that, but setup for follow on work.
+indexfilevmware=/tmp/vmware-charts/index.yaml
+vmwarecharts=$pathtocharts'/vmware-charts'
+rm -rf $vmwarecharts'-old'
+mv $vmwarecharts $vmwarecharts'-old'
+mkdir $vmwarecharts
+
+}
+
+function HELMUPDATE {
+
+#move latest verison of helm to usr bin
+sudo mv /usr/bin/helm /usr/bin/helm_old
+sudo cp $pathtocharts/tool/helm /usr/bin/helm
+
+#update helm
+helm repo update
+
+}
+
+# do bitnami work
+function GETBITNAMI {
+
+cd $bitnamicharts
+helm repo add bitnami https://charts.bitnami.com/bitnami
+helm repo update
+
+helm search repo bitnami --versions | cut -c -47 | grep -v NAME | awk '{$1=$1};1' | sed 's/ / --version /g' > fetch-bitnami.txt
+
+curl -L https://charts.bitnami.com/bitnami/index.yaml | grep -v icon: | grep -v home | grep tgz | cut -c 7- |xargs -P 10 -n 1 wget
+
+curl -o index.yaml -L https://charts.bitnami.com/bitnami/index.yaml
+
+mv fetch-bitnami.txt ../
+cd ../
+echo $(pwd)
+ls -d $bitnamicharts/* > bitnami.charts.txt
+
+cat bitnami.charts.txt |xargs -P 10 -n 1 helm template | grep image: >>imagelist.txt
+
+mv bitnami-charts /tmp/
+
+cat /tmp/bitnami-charts/index.yaml | grep icon | sed 's/    icon: //g' >> iconlist; uniq iconlist output.txt; cat -n output.txt | sed 's/^.......//' > imagelist_bitnami.txt; rm output.txt iconlist
+
+rm -rf /tmp/bitnamichartpics/
+mkdir -p /tmp/bitnamichartpics/
+
+for f in `cat imagelist_bitnami.txt`;
+do
+d=`echo $f |sed 's/https\:\/\///g' | sed 's/\//-/g'`
+j=$(echo $f |  sed 's;/;\\/;g')
+sed -i "/icon: $j/c\    icon: $imagestoreurl/$bucket/$d" $indexfilebitnami
+echo go get image "### $(echo $f| sed 's|.*/||') ###";
+curl -o /tmp/bitnamichartpics/$(echo $f | sed 's/https\:\/\///g' | sed 's/\//-/g') $f
+done
+
+sed -i "s/charts.bitnami.com/$chartstoreurl/g" $indexfilebitnami
+sed -i "s/bitnami.com/$chartstoreurl/g" $indexfilebitnami
+
+} #end BITNAMI
+
+# do kubestable and kubeincubator work
+function GETKUBE {
+
+cd $stablecharts
+helm repo add stable https://kubernetes-charts.storage.googleapis.com
+helm repo update
+
+helm search repo stable --versions | cut -c -47 | grep -v NAME | awk '{$1=$1};1' | sed 's/ / --version /g' > fetch-stable.txt
+
+curl -L  https://kubernetes-charts.storage.googleapis.com/index.yaml | grep -v icon: | grep -v home | grep tgz | cut -c 7- |xargs -P 10 -n 1 wget
+curl -o index.yaml -L https://kubernetes-charts.storage.googleapis.com/index.yaml
+
+mv fetch-stable.txt ../
+cd ../
+echo $(pwd)
+ls -d $stablecharts/* > all.stable.charts.txt
+
+cd $incubatorcharts
+helm repo add incubator https://kubernetes-charts-incubator.storage.googleapis.com
+helm repo update
+
+helm search repo incubator --versions | cut -c -47 | grep -v NAME | awk '{$1=$1};1' | sed 's/ / --version /g' > fetch-incubator.txt
+
+curl -L  https://kubernetes-charts-incubator.storage.googleapis.com/index.yaml | grep -v icon: | grep -v home | grep tgz | cut -c 7- |xargs -P 10 -n 1 wget
+
+curl -o index.yaml -L https://kubernetes-charts-incubator.storage.googleapis.com/index.yaml
+
+mv fetch-incubator.txt ../
+cd ../
+echo $(pwd)
+ls -d $stablecharts/* > all.stable.charts.txt
+
+cat all.stable.charts.txt |xargs -P 10 -n 1 helm template | grep image: >>imagelist.txt
+
+cat all.incubator.charts.txt |xargs -P 10 -n 1 helm template | grep image: >>imagelist.txt
+
+mv stable /tmp/
+mv incubator /tmp/
+
+cat /tmp/stable/index.yaml | grep icon | sed 's/    icon: //g' > iconlist; uniq iconlist output.txt; cat -n output.txt | sed 's/^.......//' > imagelist_stable.txt; rm output.txt iconlist
+cat /tmp/incubator/index.yaml | grep icon | sed 's/    icon: //g' >> iconlist; uniq iconlist output.txt; cat -n output.txt | sed 's/^.......//' > imagelist_incubator.txt; rm output.txt iconlist
+
+rm -rf /tmp/stablechartpics/
+mkdir -p /tmp/stablechartpics/
+rm -rf /tmp/incubatorchartpics/
+mkdir -p /tmp/incubatorchartpics/
+
+for f in `cat imagelist_stable.txt`;
+do
+d=`echo $f |sed 's/https\:\/\///g' | sed 's/\//-/g'`
+j=$(echo $f |  sed 's;/;\\/;g')
+sed -i "/icon: $j/c\    icon: $imagestoreurl/$bucket/$d" $indexfilestable
+echo go get image "### $(echo $f| sed 's|.*/||') ###";
+curl -o /tmp/stablechartpics/$(echo $f | sed 's/https\:\/\///g' | sed 's/\//-/g') $f &
+done
+
+for f in `cat imagelist_incubator.txt`;
+do
+d=`echo $f |sed 's/https\:\/\///g' | sed 's/\//-/g'`
+j=$(echo $f |  sed 's;/;\\/;g')
+sed -i "/icon: $j/c\    icon: $imagestoreurl/$bucket/$d" $indexfileincubator
+echo go get image "### $(echo $f| sed 's|.*/||') ###";
+curl -o /tmp/incubatorchartpics/$(echo $f | sed 's/https\:\/\///g' | sed 's/\//-/g') $f
+done
+
+sed -i "s/kubernetes-charts.storage.googleapis.com/$chartstoreurl\/stable/g"  $indexfilestable
+sed -i "s/kubernetes-charts-incubator.storage.googleapis.com/$chartstoreurl\/incubator/g"  $indexfileincubator
+
+} #end GETKUBE
+
+# do rook work
+function GETROOK {
+
+cd $rookcephcharts
+helm repo add rook-release https://charts.rook.io/release
+helm repo update
+
+helm search repo rook-release --versions | cut -c -47 | grep -v NAME | awk '{$1=$1};1' | sed 's/ / --version /g' > fetch-rookceph.txt
+
+curl -L  https://charts.rook.io/release/index.yaml | grep -v icon: | grep -v home | grep tgz | cut -c 7- |xargs -P 10 -n 1 wget
+
+curl -o index.yaml -L https://charts.rook.io/release/index.yaml
+
+mv fetch-rookceph.txt ../
+cd ../
+echo $(pwd)
+ls -d $rookcephcharts/* > rookceph.charts.txt
+
+cat rookceph.txt |xargs -P 10 -n 1 helm template | grep image: >>imagelist.txt
+
+mv rookceph-charts /tmp/
+
+cat /tmp/rookceph-charts/index.yaml | grep icon | sed 's/    icon: //g' > iconlist; uniq iconlist output.txt; cat -n output.txt | sed 's/^.......//' > imagelist_rookceph.txt; rm output.txt iconlist
+
+rm -rf /tmp/rookchartpics/
+mkdir -p /tmp/rookchartpics/
+
+for f in `cat imagelist_rookceph.txt`;
+do
+d=`echo $f |sed 's/https\:\/\///g' | sed 's/\//-/g'`
+j=$(echo $f |  sed 's;/;\\/;g')
+sed -i "/icon: $j/c\    icon: $imagestoreurl/$bucket/$d" $indexfilerookceph
+echo go get image "### $(echo $f| sed 's|.*/||') ###";
+curl -o /tmp/rookchartpics/$(echo $f | sed 's/https\:\/\///g' | sed 's/\//-/g') $f &
+done
+
+sed -i "s/charts.rook.io/$chartstoreurl\/rookceph/g" $indexfilerookceph
+
+} #end GETROOK
+
+# do rancherstable work
+function GETRANCHERSTABLE {
+
+cd $rancherstablecharts
+helm repo add rancher-stable https://releases.rancher.com/server-charts/stable
+helm repo update
+
+helm search repo rancher-stable  --versions | cut -c -47 | grep -v NAME | awk '{$1=$1};1' | sed 's/ / --version /g' > fetch-rancherstable.txt
+
+curl -L  https://releases.rancher.com/server-charts/stable/index.yaml | grep -v icon: | grep -v home | grep tgz | cut -c 7- | sed 's/^/https:\/\/releases.rancher.com\/server-charts\/stable\//'  |xargs -P 10 -n 1 wget
+
+curl -o index.yaml -L https://releases.rancher.com/server-charts/stable/index.yaml
+
+mv fetch-rancherstable.txt ../
+cd ../
+echo $(pwd)
+ls -d $rancherstablecharts/* > rancherstable.charts.txt
+
+cat rancherstable.charts.txt |xargs -P 10 -n 1 helm template | grep image: >>imagelist.txt
+
+mv rancherstable-charts /tmp/
+
+cat /tmp/rancherstable-charts/index.yaml | grep icon | sed 's/    icon: //g' > iconlist; uniq iconlist output.txt; cat -n output.txt | sed 's/^.......//' > imagelist_rancherstable.txt; rm output.txt iconlist
+
+rm -rf /tmp/rancherstablechartpics/
+mkdir -p /tmp/rancherstablechartpics/
+
+for f in `cat imagelist_rancherstable.txt`;
+do
+d=`echo $f |sed 's/https\:\/\///g' | sed 's/\//-/g'`
+j=$(echo $f |  sed 's;/;\\/;g')
+sed -i "/icon: $j/c\    icon: $imagestoreurl/$bucket/$d" $indexfilerancherstable
+echo go get image "### $(echo $f| sed 's|.*/||') ###";
+curl -o /tmp/rancherstablechartpics/$(echo $f | sed 's/https\:\/\///g' | sed 's/\//-/g') $f &
+done
+
+sed -i "s/rancher-/\https:\/\/$chartstoreurl\/rancherstable\//g" $indexfilerancherstable
+
+} #end GETRANCHERSTABLE
+
+# do rancherlatest work
+function GETRANCHERLATEST {
+
+cd $rancherlatestcharts
+helm repo add rancher-latest https://releases.rancher.com/server-charts/latest
+helm repo update
+
+helm search repo rancher-latest  --versions | cut -c -47 | grep -v NAME | awk '{$1=$1};1' | sed 's/ / --version /g' > fetch-rancherlatest.txt
+
+curl -L  https://releases.rancher.com/server-charts/latest/index.yaml | grep -v icon: | grep -v home | grep tgz | cut -c 7- | sed 's/^/https:\/\/releases.rancher.com\/server-charts\/latest\//'  |xargs -P 10 -n 1 wget
+
+curl -o index.yaml -L https://releases.rancher.com/server-charts/latest/index.yaml
+
+mv fetch-rancherlatest.txt ../
+cd ../
+echo $(pwd)
+ls -d $rancherlatestcharts/* > rancherlatest.charts.txt
+
+cat rancherlatest.charts.txt |xargs -P 10 -n 1 helm template | grep image: >>imagelist.txt
+
+mv rancherlatest-charts /tmp/
+
+cat /tmp/rancherlatest-charts/index.yaml | grep icon | sed 's/    icon: //g' > iconlist; uniq iconlist output.txt; cat -n output.txt | sed 's/^.......//' > imagelist_rancherlatest.txt; rm output.txt iconlist
+
+rm -rf /tmp/rancherlatestchartpics/
+mkdir -p /tmp/rancherlatestchartpics/
+
+for f in `cat imagelist_rancherlatest.txt`;
+do
+d=`echo $f |sed 's/https\:\/\///g' | sed 's/\//-/g'`
+j=$(echo $f |  sed 's;/;\\/;g')
+sed -i "/icon: $j/c\    icon: $imagestoreurl/$bucket/$d" $indexfilerancherlatest
+echo go get image "### $(echo $f| sed 's|.*/||') ###";
+curl -o /tmp/rancherlatestchartpics/$(echo $f | sed 's/https\:\/\///g' | sed 's/\//-/g') $f &
+done
+
+sed -i "s/rancher-/\https:\/\/$chartstoreurl\/rancherlatest\//g" $indexfilerancherlatest
+
+} #end GETRANCHERLATEST
+
+# do vmware work
+function GETVMWARE {
+
+cd $vmwarecharts
+helm repo add vmware https://vmware-tanzu.github.io/helm-charts
+helm repo update
+
+helm search repo vmware/ --versions | cut -c -25 | grep -v NAME | awk '{$1=$1};1' | sed 's/ / --version /g' > fetch-vmware.txt
+
+curl -L https://vmware-tanzu.github.io/helm-charts/index.yaml | grep -v icon: | grep -v home | grep tgz | cut -c 7- |xargs -P 10 -n 1 wget
+
+curl -o index.yaml -L https://vmware-tanzu.github.io/helm-charts/index.yaml
+sed -i "s/\*//g" index.yaml
+
+mv fetch-vmware.txt ../
+cd ../
+echo $(pwd)
+ls $vmwarecharts > vmware.charts.txt
+
+for f in `cat vmware.charts.txt`;
+do
+echo
+mkdir /tmp/$f-final
+helm template --namespace velero --set configuration.provider=aws --set configuration.backupStorageLocation.name=aws --set configuration.backupStorageLocation.bucket=bucket --set configuration.backupStorageLocation.config.region=region --set configuration.volumeSnapshotLocation.name=whatever --set configuration.volumeSnapshotLocation.config.region=region --set image.repository=velero/velero --set image.tag=v1.2.0 --set image.pullPolicy=IfNotPresent --set initContainers[0].name=velero-plugin-for-aws --set initContainers[0].image=velero/velero-plugin-for-aws:v1.0.0 --set initContainers[0].volumeMounts[0].mountPath=/target --output-dir /tmp/$f-final $vmwarecharts/$f
+grep -hR image: /tmp/$f-final >>./imagelist.txt
+cp $vmwarecharts/$f .
+tar xvf $f
+grep -hR image: |grep -v Values |grep -v Binary |grep -v .list |grep -v .txt |sed 's/^.*\(image.*\).*$/\1/' |sed 's/image://' |sed 's/\"//g' |sed 's/\#//g' |sed 's/ //g' |grep -v "'" |sort |uniq >>./imagelist.txt
+rm -rf $f
+rm -rf /tmp/$f-final
+rm -rf /tmp/$f
+done
+
+mv vmware-charts /tmp/
+
+cat /tmp/vmware-charts/index.yaml | grep icon | sed 's/    icon: //g' >> iconlist; uniq iconlist output.txt; cat -n output.txt | sed 's/^.......//'  > imagelist_vmware.txt; rm output.txt iconlist
+
+rm -rf /tmp/vmwarechartpics/
+mkdir -p /tmp/vmwarechartpics/
+
+for f in `cat imagelist_vmware.txt`;
+do
+d=`echo $f |sed 's/https\:\/\///g' | sed 's/\//-/g'`
+j=$(echo $f |  sed 's;/;\\/;g')
+sed -i "/icon: $j/c\    icon: $imagestoreurl/$bucket/$d" $indexfilevmware
+echo go get image "### $(echo $f| sed 's|.*/||') ###";
+curl -o /tmp/vmwarechartpics/$(echo $f | sed 's/https\:\/\///g' | sed 's/\//-/g') $f
+done
+
+sed -i "s/vmware-tanzu.github.io\/helm-charts/$chartstoreurl\/vmware/g" $indexfilevmware
+
+} #end GETVMWARE
+
+
+# create tar file and cleanup
+function CREATETAR {
+
+cd /tmp
+
+mkdir chartpics
+mv bitnamichartpics/* chartpics/; rm -rf bitnamichartpics
+mv stablechartpics/* chartpics/; rm -rf stablechartpics
+mv incubatorchartpics/* chartpics/; rm -rf incubatorchartpics
+mv rookchartpics/* chartpics/; rm -rf rookchartpics
+mv rancherstablechartpics/* chartpics/; rm -rf rancherstablechartpics
+mv rancherlatestchartpics/* chartpics/; rm -rf rancherlatestchartpics
+mv vmwarechartpics/* chartpics/; rm -rf vmwarechartpics
+
+tar -cf ~/helm-charts.tar chartpics stable incubator bitnami-charts vmware-charts rancherstable-charts rookceph-charts rancherlatest-charts
+rm -rf chartpics stable incubator bitnami-charts vmware-charts rancherstable-charts rookceph-charts rancherlatest-charts
+
+cd $pathtocharts
+rm -rf velero/ vmware.charts.txt imagelist.txt rancherlatest.charts.txt rancherstable.charts.txt rookceph.charts.txt bitnami.charts.txt all.stable.charts.txt imagelist_incubator.txt  imagelist_stable.txt fetch-bitnami.txt imagelist_bitnami.txt fetch-vmware.txt imagelist_vmware.txt imagelist_rookceph.txt imagelist_rancherlatest.txt imagelist_rancherstable.txt fetch-rancherlatest.txt fetch-rancherstable.txt fetch-rookceph.txt fetch-stable.txt fetch-incubator.txt
+
+} #end CREATETAR
+
+# move results to minio and s3
+function TOTHEBUCKETS {
+
+# create date variable
+d=`date +%Y-%m-%d-%H-%M`
+
+# move new container list to tmp folder
+mv ~/closed-env-container-images.txt /tmp/full-list
+
+# copy yesterdays image list from minio and s3 bucket
+mc cp minio/helmcharts/minio-closed-env-container-images.txt ~/yester-minio-list
+aws s3 cp s3://rancher-container-list/s3-closed-env-container-images.txt ~/yester-s3-list
+
+# append todays list to yesterdays list
+cat /tmp/full-list >> ~/yester-minio-list
+cat /tmp/full-list >> ~/yester-s3-list
+
+# copy old list from minio temp and s3 full_container_list bucket
+mc mv minio/helmcharts/full_container_list/temp-minio-old.txt ~/
+aws s3 mv s3://rancher-container-list/full_container_list/temp-s3-old.txt ~/
+
+# append old list to yesterdays list
+cat ~/temp-minio-old.txt >> ~/yester-minio-list
+cat ~/temp-s3-old.txt >> ~/yester-s3-list
+
+# copy then move new full list to full_container_list buckets
+mc cp /tmp/full-list minio/helmcharts/full_container_list/temp-minio-old.txt
+aws s3 mv /tmp/full-list s3://rancher-container-list/full_container_list/temp-s3-old.txt
+
+# sort out new unique list and rename back to original
+cat ~/yester-minio-list | sort | uniq -u > ~/minio-closed-env-container-images.txt
+cat ~/yester-s3-list | sort | uniq -u > ~/s3-closed-env-container-images.txt
+
+# rename and move yesterdays list in minio and s3 to old_container_lists bucket
+mc mv minio/helmcharts/minio-closed-env-container-images.txt minio/helmcharts/old_container_lists/minio-closed-env-container-images-$d
+aws s3 mv s3://rancher-container-list/s3-closed-env-container-images.txt s3://rancher-container-list/old_container_lists/s3-closed-env-container-images-$d
+
+# move new unique list back to minio and s3 bucket
+mc cp ~/minio-closed-env-container-images.txt minio/helmcharts
+aws s3 cp ~/s3-closed-env-container-images.txt s3://rancher-container-list
+
+# move old helm-charts.tar to minio and s3 old_charts bucket
+mc mv minio/helmcharts/helm-charts.tar minio/helmcharts/old_charts/helm-charts-$d.tar
+aws s3 mv s3://rancher-container-list/helm-charts.tar s3://rancher-container-list/old_charts/helm-charts-$d.tar
+
+# move new helm-charts.tar
+mc cp ~/helm-charts.tar minio/helmcharts
+aws s3 cp ~/helm-charts.tar s3://rancher-container-list
+
+# remove any charts older than 7 days
+mc rm --recursive --force --older-than 7d minio/helmcharts/old_charts/
+
+# remove any container lists older than 30 days
+mc rm --recursive --force --older-than 30d minio/helmcharts/old_container_lists/
+
+# cleanup
+rm -rf ~/helm-charts.tar ~/minio-closed-env-container-images.txt ~/s3-closed-env-container-images.txt ~/yester-minio-list ~/yester-s3-list ~/temp-minio-old.txt ~/temp-s3-old.txt
+
+# show updated buckets
+mc ls minio/helmcharts
+aws s3 ls s3://rancher-container-list
+
+echo happy dance
+
+} #end TOTHEBUCKETS
