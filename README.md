@@ -43,7 +43,7 @@ With more to come! As Helm Hub replaces Helm Charts and projects host their own 
 ### How to run
 You can run this all in an already created docker container by running the following command
 ```
-docker run --name offline-helm-project -e KUBE_LATEST_VERSION="v1.18.3" -e HELM_VERSION="v3.2.4" -e MC_ALIAS="minio" -e MC_ENDPOINT="<Your_Misio_URL>" -e MC_ACCESS_KEY="<Your_Minio_KEY>" -e MC_SECRET_KEY="<Your_Minio_Password>" slvs/offline-helm-project:0.1.1
+docker run --name offline-helm-project -e KUBE_LATEST_VERSION="v1.18.3" -e HELM_VERSION="v3.2.4" -e MC_ALIAS="minio" -e MC_ENDPOINT="<Your_Misio_URL>" -e MC_ACCESS_KEY="<Your_Minio_KEY>" -e MC_SECRET_KEY="<Your_Minio_Password>" docker.io/ndorr/offline_helm:0.3
 ```
 
 ### Clean Up
@@ -73,6 +73,6 @@ sudo cp tools/helm /usr/bin/
 ### Script Usage
 First get your helm Charts and List of Associated Docker Containers and the Pictures associated with the charts using this script
 ```
-./all_gather_plus_pics.sh
+./gather_helms.sh
 ```
 
