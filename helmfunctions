@@ -104,6 +104,7 @@ done
 
 sed -i "s/charts.bitnami.com/$chartstoreurl/g" $indexfilebitnami
 sed -i "s/bitnami.com/$chartstoreurl/g" $indexfilebitnami
+sed 's#https://test.com/pics/test.com-#https://test.com/pics/bitnami.com-#g' $indexfilebitnami # <-- fixes test.com issue
 
 } #end BITNAMI
 
