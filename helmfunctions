@@ -104,7 +104,6 @@ done
 
 sed -i "s/charts.bitnami.com/$chartstoreurl/g" $indexfilebitnami
 sed -i "s/bitnami.com/$chartstoreurl/g" $indexfilebitnami
-sed 's#https://test.com/pics/test.com-#https://test.com/pics/bitnami.com-#g' $indexfilebitnami # <-- fixes test.com issue
 
 } #end BITNAMI
 
@@ -355,6 +354,9 @@ sed -i "s/vmware-tanzu.github.io\/helm-charts/$chartstoreurl\/vmware/g" $indexfi
 # create tar file and cleanup
 function CREATETAR {
 
+cat imagelist.txt |sed 's/^.*\(image.*\).*$/\1/' |sed 's/image://' |sed 's/\"//g' |grep -v "'" |sed 's/^ *//;s/ *$//;s/  */ /;' |sort |uniq  >~/closed-env-container-images.txt
+sed 's#https://test.com/pics/test.com-#https://test.com/pics/bitnami.com-#g' -i $indexfilebitnami # <-- fixes test.com issue
+
 cd /tmp
 
 mkdir chartpics
@@ -374,7 +376,7 @@ rm -rf velero/ vmware.charts.txt imagelist.txt rancherlatest.charts.txt ranchers
 
 } #end CREATETAR
 
-# move results to minio and s3
+# move results to minio and s3 <-- commenting out minio until future use
 function TOTHEBUCKETS {
 
 # create date variable
@@ -384,56 +386,56 @@ d=`date +%Y-%m-%d-%H-%M`
 mv ~/closed-env-container-images.txt /tmp/full-list
 
 # copy yesterdays image list from minio and s3 bucket
-mc cp minio/helmcharts/minio-closed-env-container-images.txt ~/yester-minio-list
+#mc cp minio/helmcharts/minio-closed-env-container-images.txt ~/yester-minio-list
 aws s3 cp s3://rancher-container-list/s3-closed-env-container-images.txt ~/yester-s3-list
 
 # append todays list to yesterdays list
-cat /tmp/full-list >> ~/yester-minio-list
+#cat /tmp/full-list >> ~/yester-minio-list
 cat /tmp/full-list >> ~/yester-s3-list
 
 # copy old list from minio temp and s3 full_container_list bucket
-mc mv minio/helmcharts/full_container_list/temp-minio-old.txt ~/
+#mc mv minio/helmcharts/full_container_list/temp-minio-old.txt ~/
 aws s3 mv s3://rancher-container-list/full_container_list/temp-s3-old.txt ~/
 
 # append old list to yesterdays list
-cat ~/temp-minio-old.txt >> ~/yester-minio-list
+#cat ~/temp-minio-old.txt >> ~/yester-minio-list
 cat ~/temp-s3-old.txt >> ~/yester-s3-list
 
 # copy then move new full list to full_container_list buckets
-mc cp /tmp/full-list minio/helmcharts/full_container_list/temp-minio-old.txt
+#mc cp /tmp/full-list minio/helmcharts/full_container_list/temp-minio-old.txt
 aws s3 mv /tmp/full-list s3://rancher-container-list/full_container_list/temp-s3-old.txt
 
 # sort out new unique list and rename back to original
-cat ~/yester-minio-list | sort | uniq -u > ~/minio-closed-env-container-images.txt
+#cat ~/yester-minio-list | sort | uniq -u > ~/minio-closed-env-container-images.txt
 cat ~/yester-s3-list | sort | uniq -u > ~/s3-closed-env-container-images.txt
 
 # rename and move yesterdays list in minio and s3 to old_container_lists bucket
-mc mv minio/helmcharts/minio-closed-env-container-images.txt minio/helmcharts/old_container_lists/minio-closed-env-container-images-$d
+#mc mv minio/helmcharts/minio-closed-env-container-images.txt minio/helmcharts/old_container_lists/minio-closed-env-container-images-$d
 aws s3 mv s3://rancher-container-list/s3-closed-env-container-images.txt s3://rancher-container-list/old_container_lists/s3-closed-env-container-images-$d
 
 # move new unique list back to minio and s3 bucket
-mc cp ~/minio-closed-env-container-images.txt minio/helmcharts
+#mc cp ~/minio-closed-env-container-images.txt minio/helmcharts
 aws s3 cp ~/s3-closed-env-container-images.txt s3://rancher-container-list
 
 # move old helm-charts.tar to minio and s3 old_charts bucket
-mc mv minio/helmcharts/helm-charts.tar minio/helmcharts/old_charts/helm-charts-$d.tar
+#mc mv minio/helmcharts/helm-charts.tar minio/helmcharts/old_charts/helm-charts-$d.tar
 aws s3 mv s3://rancher-container-list/helm-charts.tar s3://rancher-container-list/old_charts/helm-charts-$d.tar
 
 # move new helm-charts.tar
-mc cp ~/helm-charts.tar minio/helmcharts
+#mc cp ~/helm-charts.tar minio/helmcharts
 aws s3 cp ~/helm-charts.tar s3://rancher-container-list
 
 # remove any charts older than 7 days
-mc rm --recursive --force --older-than 7d minio/helmcharts/old_charts/
+#mc rm --recursive --force --older-than 7d minio/helmcharts/old_charts/
 
 # remove any container lists older than 30 days
-mc rm --recursive --force --older-than 30d minio/helmcharts/old_container_lists/
+#mc rm --recursive --force --older-than 30d minio/helmcharts/old_container_lists/
 
 # cleanup
 rm -rf ~/helm-charts.tar ~/minio-closed-env-container-images.txt ~/s3-closed-env-container-images.txt ~/yester-minio-list ~/yester-s3-list ~/temp-minio-old.txt ~/temp-s3-old.txt
 
 # show updated buckets
-mc ls minio/helmcharts
+#mc ls minio/helmcharts
 aws s3 ls s3://rancher-container-list
 
 echo happy dance
